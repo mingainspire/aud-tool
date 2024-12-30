@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/marked/2.0.0/marked.min.css">
+  <style>
+    .dark-mode {
+      --bg-primary: #1f2937;
+      --text-primary: #d1d5db;
+      --bg-secondary: #374151;
+      --text-secondary: #9ca3af;
+    }
+    .light-mode {
+      --bg-primary: #f3f4f6;
+      --text-primary: #1f2937;
+      --bg-secondary: #e5e7eb;
+      --text-secondary: #374151;
+    }
+  </style>
+</head>
+<body class="dark-mode h-screen flex items-center justify-center relative">
+  <!-- Main Chat Interface -->
+  <div class="w-full h-full bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-md rounded-md p-4 flex flex-col relative">
+    <div class="flex justify-between items-center mb-4">
+      <button id="powerButton" class="w-16 h-16 bg-[var(--bg-secondary)] text-[var(--text-primary)] rounded-full"></button>
+      <button id="historyButton" class="w-16 h-16 bg-[var(--bg-secondary)] text-[var(--text-primary)] rounded-full ml-2"><i class="fas fa-history"></i></button>
+    </div>
+    <div id="conversation" class="flex-grow bg-[var(--bg-secondary)] p-4 overflow-y-auto mb-4 text-lg"></div>
+    <div class="flex gap-2">
+      <input id="messageInput" type="text" class="flex-1 rounded-md p-2 text-black" placeholder="Type your message...">
+      <button id="talkButton" class="bg-[var(--bg-secondary)] text-[var(--text-primary)] px-4 py-2 rounded-md text-2xl whitespace-nowrap">Talk</button>
+    </div>
+  </div>
+
+  <!-- Settings Panel -->
+  <div id="applet" class="applet fixed top-0 right-0 w-48 h-full shadow-md p-4 bg-[var(--bg-secondary)] text-[var(--text-primary)] transform translate-x-full transition-transform duration-300">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-sm font-bold">Settings</h2>
+      <button id="toggleMode" class="text-xl">
+        <i class="fas fa-moon"></i>
+      </button>
+    </div>
+    <div class="mb-2">
+      <input id="baseUrl" type="text" class="w-full border rounded-md p-1 bg-[var(--bg-primary)] text-[var(--text-primary)] text-sm" placeholder="Base URL">
+    </div>
+    <div class="mb-2">
+      <input id="apiKey" type="text" class="w-full border rounded-md p-1 bg-[var(--bg-primary)] text-[var(--text-primary)] text-sm" placeholder="API Key">
+    </div>
+    <div class="mb-2">
+      <input id="preferredModel" type="text" class="w-full border rounded-md p-1 bg-[var(--bg-primary)] text-[var(--text-primary)] text-sm" placeholder="Preferred Model">
+    </div>
+    <div class="mb-2">
+      <textarea id="userInfo" class="w-full border rounded-md p-1 h-16 bg-[var(--bg-primary)] text-[var(--text-primary)] text-sm" placeholder="What you should know about me"></textarea>
+    </div>
+    <div class="mb-2">
+      <textarea id="responseInstructions" class="w-full border rounded-md p-1 h-16 bg-[var(--bg-primary)] text-[var(--text-primary)] text-sm" placeholder="How I want you to respond"></textarea>
+    </div>
+    <div class="mb-2">
+      <label class="block text-sm">AI Speech</label>
+      <input id="aiSpeechToggle" type="checkbox" class="mr-2"> Enable AI Speech
+    </div>
+    <div class="flex justify-between mt-2">
+      <button id="decreaseTextSize" class="px-2 py-1 rounded-md bg-[var(--bg-primary)] text-[var(--text-primary)] text-sm">-</button>
+      <button id="increaseTextSize" class="px-2 py-1 rounded-md bg-[var(--bg-primary)] text-[var(--text-primary)] text-sm">+</button>
+    </div>
+    <button id="saveSettings" class="mt-2 px-2 py-1 rounded-md bg-[var(--bg-primary)] text-[var(--text-primary)] text-sm">Save</button>
+    <div class="mt-2 text-center text-xs">
+      <p>Created by <a href="https://Ai-Nspired.com" target="_blank" class="text-blue-400">Ai-N</a></p>
+    </div>
+  </div>
+
+  <!-- History Panel -->
+  <div id="history" class="history fixed top-0 left-0 w-48 h-full shadow-md p-4 bg-[var(--bg-secondary)] text-[var(--text-primary)] transform -translate-x-full transition-transform duration-300">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-sm font-bold">Chat History</h2>
+      <button id="closeHistory" class="text-xl">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div id="historyList" class="overflow-y-auto mb-4">
+      <!-- Chat history items will be appended here -->
+    </div>
+    <div class="flex justify-between">
+      <button id="copyHistory" class="px-2 py-1 rounded-md bg-[var(--bg-primary)] text-[var(--text-primary)] text-sm">Copy</button>
+      <button id="exportHistory" class="px-2 py-1 rounded-md bg-[var(--bg-primary)] text-[var(--text-primary)] text-sm">Export</button>
+    </div>
+  </div>
+
+  <!-- External Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/2.0.0/marked.min.js"></script>
+
+  <!-- Main Application Script -->
+  <script>
+    // ====================
+    // DOM Element Connectors
+    // ====================
+    const talkButton = document.getElementById('talkButton');
+    const messageInput = document.getElementById('messageInput');
+    const conversation = document.getElementById('conversation');
+    const powerButton = document.getElementById('powerButton');
+    const historyButton = document.getElementById('historyButton');
+    const applet = document.getElementById('applet');
+    const history = document.getElementById('history');
+    const closeHistory = document.getElementById('closeHistory');
+    const historyList = document.getElementById('historyList');
+    const copyHistory = document.getElementById('copyHistory');
+    const exportHistory = document.getElementById('exportHistory');
+    const toggleMode = document.getElementById('toggleMode');
+    const saveSettings = document.getElementById('saveSettings');
+    const decreaseTextSize = document.getElementById('decreaseTextSize');
+    const increaseTextSize = document.getElementById('increaseTextSize');
+    const aiSpeechToggle = document.getElementById('aiSpeechToggle');
+    const baseUrlInput = document.getElementById('baseUrl');
+    const apiKeyInput = document.getElementById('apiKey');
+    const preferredModelInput = document.getElementById('preferredModel');
+    const userInfoInput = document.getElementById('userInfo');
+    const responseInstructionsInput = document.getElementById('responseInstructions');
+
+    // ====================
+    // State Variables
+    // ====================
+    let baseUrl = '';
+    let apiKey = '';
+    let preferredModel = '';
+    let userInfo = '';
+    let responseInstructions = '';
+    let textSize = 16;
+    let recognizing = false;
+    let recognition;
+    let currentUtterance = null;
+    let aiSpeechEnabled = true;
+    let chatHistory = JSON.parse(localStorage.getItem('chatHistory')) || [];
+
+    // ====================
+    // Speech Recognition Setup
+    // ====================
+    if ('webkitSpeechRecognition' in window) {
+      recognition = new webkitSpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = function() {
+        recognizing = true;
+        talkButton.textContent = 'Stop';
+      };
+
+      recognition.onend = function() {
+        recognizing = false;
+        updateTalkButtonText();
+      };
+
+      recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        messageInput.value = transcript;
+        addMessage();
+      };
+    } else {
+      alert('Speech recognition not supported in this browser.');
+    }
+
+    // ====================
+    // Core Message Handling
+    // ====================
+    async function addMessage() {
+      const message = messageInput.value.trim();
+      if (message) {
+        const messageElement = document.createElement('p');
+        messageElement.textContent = message;
+        conversation.appendChild(messageElement);
+        messageInput.value = '';
+        conversation.scrollTop = conversation.scrollHeight;
+
+        const thinkingElement = document.createElement('p');
+        thinkingElement.textContent = '...';
+        conversation.appendChild(thinkingElement);
+        conversation.scrollTop = conversation.scrollHeight;
+
+        powerButton.classList.add('pulsate');
+
+        try {
+          const payload = {
+            model: preferredModel,
+            messages: [
+              { role: "system", content: `What you should know about me: ${userInfo}\nHow I want you to respond: ${responseInstructions}` },
+              { role: "user", content: message }
+            ]
+          };
+
+          const response = await fetch(`${baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+          }
+
+          const data = await response.json();
+          const aiMessageContent = data.choices[0].message.content.trim();
+          const aiMessageElement = document.createElement('div');
+          aiMessageElement.innerHTML = marked(aiMessageContent);
+          aiMessageElement.classList.add('ai-message');
+          conversation.appendChild(aiMessageElement);
+          conversation.scrollTop = conversation.scrollHeight;
+
+          saveToHistory(message, aiMessageContent);
+
+          if (aiSpeechEnabled) {
+            currentUtterance = new SpeechSynthesisUtterance(aiMessageContent);
+            currentUtterance.onend = () => {
+              talkButton.click();
+            };
+            speechSynthesis.speak(currentUtterance);
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          const errorMessageElement = document.createElement('p');
+          errorMessageElement.textContent = `Error: ${error.message}`;
+          conversation.appendChild(errorMessageElement);
+          conversation.scrollTop = conversation.scrollHeight;
+        } finally {
+          conversation.removeChild(thinkingElement);
+          powerButton.classList.remove('pulsate');
+        }
+      }
+    }
+
+    // ====================
+    // History Management
+    // ====================
+    function saveToHistory(userMessage, aiMessage) {
+      const timestamp = new Date().toLocaleString();
+      chatHistory.push({ timestamp, userMessage, aiMessage });
+      localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+    }
+
+    function loadChatHistory() {
+      historyList.innerHTML = '';
+      chatHistory.forEach((chat, index) => {
+        const chatItem = document.createElement('div');
+        chatItem.classList.add('mb-2', 'p-2', 'bg-primary', 'rounded-md');
+        chatItem.innerHTML = `
+          <p class="text-xs text-secondary">${chat.timestamp}</p>
+          <p class="text-sm"><strong>You:</strong> ${chat.userMessage}</p>
+          <p class="text-sm"><strong>AI:</strong> ${chat.aiMessage}</p>
+        `;
+        historyList.appendChild(chatItem);
+      });
+    }
+
+    // ====================
+    // Event Listeners
+    // ====================
+    powerButton.addEventListener('click', () => {
+      applet.classList.toggle('translate-x-full');
+    });
+
+    historyButton.addEventListener('click', () => {
+      history.classList.toggle('-translate-x-full');
+      loadChatHistory();
+    });
+
+    closeHistory.addEventListener('click', () => {
+      history.classList.add('-translate-x-full');
+    });
+
+    copyHistory.addEventListener('click', () => {
+      const historyText = chatHistory.map(chat => `You: ${chat.userMessage}\nAI: ${chat.aiMessage}`).join('\n\n');
+      navigator.clipboard.writeText(historyText).then(() => {
+        alert('Chat history copied to clipboard');
+      });
+    });
+
+    exportHistory.addEventListener('click', () => {
+  const historyText = chatHistory.map(chat => `You: ${chat.userMessage}\nAI: ${chat.aiMessage}`).join('\n\n');
+  const blob = new Blob([historyText], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'chat_history.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+toggleMode.addEventListener('click', () => {
+  if (document.body.classList.contains('dark-mode')) {
+    document.body.classList.remove('dark-mode');
+    document.body.classList.add('light-mode');
+    toggleMode.innerHTML = '<i class="fas fa-sun"></i>';
+  } else {
+    document.body.classList.remove('light-mode');
+    document.body.classList.add('dark-mode');
+    toggleMode.innerHTML = '<i class="fas fa-moon"></i>';
+  }
+  updateButtonColors();
+});
+
+saveSettings.addEventListener('click', () => {
+  const newBaseUrl = baseUrlInput.value;
+  if (!isValidUrl(newBaseUrl)) {
+    alert("Please enter a valid URL.");
+    return;
+  }
+  baseUrl = newBaseUrl;
+  apiKey = apiKeyInput.value;
+  preferredModel = preferredModelInput.value;
+  userInfo = userInfoInput.value;
+  responseInstructions = responseInstructionsInput.value;
+  aiSpeechEnabled = aiSpeechToggle.checked;
+
+  localStorage.setItem('baseUrl', baseUrl);
+  localStorage.setItem('apiKey', apiKey);
+  localStorage.setItem('preferredModel', preferredModel);
+  localStorage.setItem('userInfo', userInfo);
+  localStorage.setItem('responseInstructions', responseInstructions);
+  localStorage.setItem('aiSpeechEnabled', aiSpeechEnabled);
+
+  updateTalkButtonText();
+  applet.classList.add('translate-x-full');
+});
+
+talkButton.addEventListener('click', () => {
+  if (recognizing) {
+    recognition.stop();
+  } else if (!aiSpeechEnabled) {
+    addMessage();
+  } else {
+    if (currentUtterance) {
+      speechSynthesis.cancel();
+      currentUtterance = null;
+    }
+    recognition.start();
+  }
+});
+
+messageInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    addMessage();
+  }
+});
+
+decreaseTextSize.addEventListener('click', () => {
+  textSize = Math.max(12, textSize - 2);
+  conversation.style.fontSize = `${textSize}px`;
+});
+
+increaseTextSize.addEventListener('click', () => {
+  textSize = Math.min(24, textSize + 2);
+  conversation.style.fontSize = `${textSize}px`;
+});
+
+// ====================
+// Utility Functions
+// ====================
+function isValidUrl(url) {
+  const pattern = new RegExp('^(https?:\\/\\/)?'+ 
+    '((([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\\.)+[a-z]{2,}|'+ 
+    'localhost|'+ 
+    '\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|'+ 
+    '\\[?[a-f0-9]*:[a-f0-9:%.]*\\]?)'+ 
+    '(\\:\\d+)?(\\/[-a-z0-9%_.~+]*)*'+ 
+    '(\\?[;&a-z0-9%_.~+=-]*)?'+ 
+    '(\\#[-a-z0-9_]*)?$','i'); 
+  return !!pattern.test(url);
+}
+
+function updateTalkButtonText() {
+  talkButton.textContent = aiSpeechEnabled ? (recognizing ? 'Stop' : 'Talk') : 'Send';
+}
+
+function updateButtonColors() {
+  const isDarkMode = document.body.classList.contains('dark-mode');
+  const elementsToUpdate = [
+    powerButton,
+    talkButton,
+    messageInput,
+    ...document.querySelectorAll('.menu input, .menu textarea')
+  ];
+
+  elementsToUpdate.forEach(element => {
+    element.classList.toggle('bg-secondary', true);
+    element.classList.toggle('text-primary', true);
+    element.classList.toggle('bg-white', !isDarkMode);
+    element.classList.toggle('text-black', !isDarkMode);
+  });
+}
+
+// ====================
+// Initialization
+// ====================
+window.onload = () => {
+  baseUrl = localStorage.getItem('baseUrl') || '';
+  apiKey = localStorage.getItem('apiKey') || '';
+  preferredModel = localStorage.getItem('preferredModel') || '';
+  userInfo = localStorage.getItem('userInfo') || '';
+  responseInstructions = localStorage.getItem('responseInstructions') || '';
+  aiSpeechEnabled = localStorage.getItem('aiSpeechEnabled') === 'true';
+
+  baseUrlInput.value = baseUrl;
+  apiKeyInput.value = apiKey;
+  preferredModelInput.value = preferredModel;
+  userInfoInput.value = userInfo;
+  responseInstructionsInput.value = responseInstructions;
+  aiSpeechToggle.checked = aiSpeechEnabled;
+
+  updateTalkButtonText();
+  updateButtonColors();
+};
+</script>
+</body>
+</html>
